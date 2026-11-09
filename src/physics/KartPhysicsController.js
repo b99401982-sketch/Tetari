@@ -303,6 +303,9 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
     lapCount: 1,
     currentLapTime: 0.0,
     totalRaceTime: 0.0,
+    timeTrialLimit: 60.0, // 1 minute (60.00s) time trial ending limit
+    timeRemaining: 60.0,
+    finishReason: null, // '1_MIN_LIMIT' or 'LAPS_COMPLETE'
     lapTimes: [],
     raceFinished: false,
     finishTotalTime: null,
@@ -410,6 +413,8 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
       state.lapCount = 1;
       state.lapTimes = [];
       state.finishTotalTime = null;
+      state.finishReason = null;
+      state.timeRemaining = 60.0;
       state.cornerCleanTimer = 0.0;
       state.railImpactActive = false;
       state.railHitCooldown = 0.0;
@@ -453,6 +458,8 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
     state.raceFinished = false;
     state.totalRaceTime = 0.0;
     state.currentLapTime = 0.0;
+    state.timeRemaining = 60.0;
+    state.finishReason = null;
     state.lapCount = 1;
     state.lapTimes = [];
     state.finishTotalTime = null;
@@ -1031,6 +1038,7 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
       state.raceClockActive = false;
       state.currentLapTime = 0.0;
       state.totalRaceTime = 0.0;
+      state.timeRemaining = 60.0;
       state.lapCount = 1;
     } else if (!state.victoryCruise && !state.raceFinished) {
       if (state.currentLapTime > 0 && state.totalRaceTime < state.currentLapTime) {
@@ -1043,7 +1051,44 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
         state.currentLapTime += clampedDt;
         state.totalRaceTime += clampedDt;
       }
-      if (state.speed > 0 && state.currentLapTime > 2.5) {
+      state.timeRemaining = Math.max(0.0, 60.0 - state.totalRaceTime);
+
+      // Check 1-minute time trial ending line limit (60.00s)
+      const TIME_LIMIT_SECONDS = 60.0;
+      if (state.raceClockActive && state.totalRaceTime >= TIME_LIMIT_SECONDS) {
+        state.totalRaceTime = TIME_LIMIT_SECONDS;
+        state.finishTotalTime = TIME_LIMIT_SECONDS;
+        state.timeRemaining = 0.0;
+        state.raceFinished = true;
+        state.raceClockActive = false;
+        state.victoryCruise = false;
+        state.boostActive = 0.0;
+        state.finishReason = '1_MIN_LIMIT';
+        if (state.lastLapTime === null) {
+          state.lastLapTime = state.currentLapTime;
+        }
+        if (state.bestLapTime === null || (state.lastLapTime && state.lastLapTime < state.bestLapTime)) {
+          state.bestLapTime = state.lastLapTime;
+        }
+        if (onLapCompleteCallback) {
+          onLapCompleteCallback(
+            state.lastLapTime,
+            state.bestLapTime,
+            state.lapCount,
+            state.finishTotalTime,
+            true,
+            '1_MIN_LIMIT'
+          );
+        }
+        if (onRaceFinishCallback) {
+          onRaceFinishCallback(
+            state.finishTotalTime,
+            state.lapTimes.slice(),
+            state.bestLapTime,
+            '1_MIN_LIMIT'
+          );
+        }
+      } else if (state.speed > 0 && state.currentLapTime > 2.5) {
         const distBefore =
           ((startFinishArc - prevS) % totalLength + totalLength) % totalLength;
         if (distBefore > 0 && distBefore <= ds * 1.5) {
@@ -1072,20 +1117,23 @@ export async function createKartPhysicsController(splineData, manifest, roadGeo)
             state.raceClockActive = false;
             state.victoryCruise = false;
             state.boostActive = 0.0;
+            state.finishReason = 'LAPS_COMPLETE';
             if (onLapCompleteCallback) {
               onLapCompleteCallback(
                 state.lastLapTime,
                 state.bestLapTime,
                 3,
                 state.finishTotalTime,
-                true
+                true,
+                'LAPS_COMPLETE'
               );
             }
             if (onRaceFinishCallback) {
               onRaceFinishCallback(
                 state.finishTotalTime,
                 state.lapTimes.slice(),
-                state.bestLapTime
+                state.bestLapTime,
+                'LAPS_COMPLETE'
               );
             }
           }

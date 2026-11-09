@@ -44,8 +44,15 @@
             <div id="hud-lap-widget" class="hud-lap-widget">
               <div id="hud-lap-header" class="hud-lap-header">
                 LAP <span id="hud-lap-curr" class="hud-lap-curr">1</span>/3
+                <span class="hud-time-target-badge">1 MINUTE</span>
               </div>
               <div id="hud-lap-timer" class="hud-lap-timer" aria-label="00:00.00"><span class="timer-digit" id="lap-d0">0</span><span class="timer-digit" id="lap-d1">0</span><span class="timer-sep">:</span><span class="timer-digit" id="lap-d2">0</span><span class="timer-digit" id="lap-d3">0</span><span class="timer-sep">.</span><span class="timer-digit" id="lap-d4">0</span><span class="timer-digit" id="lap-d5">0</span></div>
+              <div class="hud-1min-track" title="1 Minute Time Trial Progress">
+                <div id="hud-1min-bar" class="hud-1min-bar"></div>
+              </div>
+              <div id="hud-ending-warning" class="hud-ending-warning hidden">
+                <span class="pulse-beacon"></span> ENDING LINE IN <span id="hud-ending-sec">10</span>S
+              </div>
               <div id="hud-lap-split" class="hud-lap-split hidden"></div>
             </div>
 
@@ -77,7 +84,7 @@
       <!-- Welcome & Controls Dialog (Shown on Launch & When Clicking "Desk Racer") -->
       <div id="welcome-dialog-overlay" class="welcome-dialog-overlay">
         <div class="welcome-dialog-card" role="dialog" aria-labelledby="welcome-title">
-          <div class="welcome-eyebrow">DESKTOP CIRCUIT · 3 LAPS</div>
+          <div class="welcome-eyebrow">DESKTOP CIRCUIT · 1-MINUTE TIME TRIAL</div>
           <h1 id="welcome-title" class="welcome-title">DESK RACER</h1>
 
           <div class="welcome-controls-grid">
@@ -121,7 +128,7 @@
 
           <div class="welcome-footer-row">
             <button id="btn-welcome-start" class="welcome-start-btn" type="button">
-              <span id="welcome-start-text" class="welcome-start-text">START TIME TRIAL</span>
+              <span id="welcome-start-text" class="welcome-start-text">START 1-MIN TIME TRIAL</span>
               <kbd id="welcome-enter-kbd" class="welcome-enter-kbd">ENTER ↵</kbd>
               <span class="welcome-btn-progress-track" aria-hidden="true">
                 <span id="welcome-btn-progress-fill" class="welcome-btn-progress-fill"></span>
@@ -136,10 +143,11 @@
 
       <div id="hud-finish-overlay" class="welcome-dialog-overlay hud-finish-overlay hidden" role="dialog" aria-labelledby="hud-finish-title">
         <div class="welcome-dialog-card finish-dialog-card">
-          <div class="welcome-eyebrow">DESKTOP CIRCUIT · 3 LAPS COMPLETE</div>
-          <h2 id="hud-finish-title" class="hud-finish-title">FINISH</h2>
-          <div id="hud-finish-time" class="hud-finish-time">00:00.00</div>
+          <div id="hud-finish-eyebrow" class="welcome-eyebrow">DESKTOP CIRCUIT · 1-MINUTE TIME TRIAL</div>
+          <h2 id="hud-finish-title" class="hud-finish-title">ENDING LINE REACHED</h2>
+          <div id="hud-finish-time" class="hud-finish-time">01:00.00</div>
           <div id="hud-finish-sub" class="hud-finish-sub">BEST LAP 00:00.00</div>
+          <div id="hud-finish-badge" class="hud-finish-badge">✦ 1 MINUTE TIME TRIAL COMPLETE ✦</div>
           <div class="finish-actions-row">
             <button id="btn-finish-race-again" class="welcome-start-btn finish-action-btn" type="button">
               <span class="welcome-start-text">RACE AGAIN</span>

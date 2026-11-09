@@ -12,6 +12,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import { buildProceduralDeskDiorama } from './scene/DeskDioramaBuilder.js';
 import { buildCoasterTrack } from './scene/CoasterTrackBuilder.js';
+import { buildEndingLine } from './scene/EndingLineBuilder.js';
 import { buildMicroKart } from './scene/MicroKartBuilder.js';
 import { buildGoldenHourAtmosphere } from './scene/GoldenHourAtmosphere.js';
 import { buildRoomEnvironment } from './scene/RoomEnvironmentBuilder.js';
@@ -256,6 +257,9 @@ async function initApp() {
     scene.add(coaster.underTrackLedGroup);
   }
   scene.add(coaster.debugGroup);
+
+  const endingLine = buildEndingLine(splineData);
+  scene.add(endingLine.group);
 
   const microKart = buildMicroKart();
   microKart.kartRoot.scale.setScalar(0.38);
@@ -1844,6 +1848,51 @@ async function initApp() {
       strokeElevationTier(tier.min, tier.max, tier.side, 12.2, 4.0);
       strokeElevationTier(tier.min, tier.max, tier.shade, 12.0, 0.0);
     }
+
+    // Render distinct Checkered Ending Line Marker on Minimap
+    const sFinish = pts[startFinishIdx].position;
+    const fx = mapMinimapX(sFinish[0], sFinish[1], sFinish[2]);
+    const fy = mapMinimapY(sFinish[0], sFinish[1], sFinish[2]);
+
+    bgCtx.save();
+    bgCtx.translate(fx, fy);
+
+    // Checkered finish bar across track line
+    const barW = 16;
+    const barH = 26;
+    bgCtx.fillStyle = '#0a0d14';
+    bgCtx.fillRect(-barW * 0.5, -barH * 0.5, barW, barH);
+    bgCtx.strokeStyle = '#ffaa44';
+    bgCtx.lineWidth = 2;
+    bgCtx.strokeRect(-barW * 0.5, -barH * 0.5, barW, barH);
+
+    const sqW = barW * 0.5;
+    const sqH = barH * 0.25;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 2; c++) {
+        if ((r + c) % 2 === 0) {
+          bgCtx.fillStyle = '#ffffff';
+          bgCtx.fillRect(-barW * 0.5 + c * sqW, -barH * 0.5 + r * sqH, sqW, sqH);
+        }
+      }
+    }
+
+    // Mini checkered flag badge with "FINISH"
+    bgCtx.fillStyle = 'rgba(10, 14, 24, 0.9)';
+    bgCtx.strokeStyle = '#00e5ff';
+    bgCtx.lineWidth = 1.5;
+    bgCtx.beginPath();
+    bgCtx.roundRect(-22, -barH * 0.5 - 20, 44, 16, 4);
+    bgCtx.fill();
+    bgCtx.stroke();
+
+    bgCtx.fillStyle = '#00e5ff';
+    bgCtx.font = '900 italic 10px "Orbitron", sans-serif';
+    bgCtx.textAlign = 'center';
+    bgCtx.textBaseline = 'middle';
+    bgCtx.fillText('FINISH', 0, -barH * 0.5 - 12);
+
+    bgCtx.restore();
   }
 
   function drawMinimapRadar(st) {
@@ -1894,6 +1943,9 @@ async function initApp() {
   const elLapCurr = document.getElementById('hud-lap-curr');
   const elLapTimer = document.getElementById('hud-lap-timer');
   const elLapSplit = document.getElementById('hud-lap-split');
+  const el1MinBar = document.getElementById('hud-1min-bar');
+  const elEndingWarning = document.getElementById('hud-ending-warning');
+  const elEndingSec = document.getElementById('hud-ending-sec');
   const lapDigitEls = [
     document.getElementById('lap-d0'),
     document.getElementById('lap-d1'),
@@ -1904,8 +1956,11 @@ async function initApp() {
   ];
   const elF1Countdown = document.getElementById('hud-f1-countdown');
   const elFinishOverlay = document.getElementById('hud-finish-overlay');
+  const elFinishEyebrow = document.getElementById('hud-finish-eyebrow');
+  const elFinishTitle = document.getElementById('hud-finish-title');
   const elFinishTime = document.getElementById('hud-finish-time');
   const elFinishSub = document.getElementById('hud-finish-sub');
+  const elFinishBadge = document.getElementById('hud-finish-badge');
   const elVisorInline = document.getElementById('visor-telem-inline');
 
   function formatLapTimerMMSSCC(seconds) {
@@ -1947,19 +2002,35 @@ async function initApp() {
     if (elFinishOverlay) {
       elFinishOverlay.classList.add('hidden');
     }
+    if (endingLine && endingLine.resetCelebration) {
+      endingLine.resetCelebration();
+    }
     if (typeof syncMobileTouchControlsVisibility === 'function') {
       syncMobileTouchControlsVisibility();
     }
   }
 
-  function showFinishOverlay(totalTime, bestLap, playAudio = true) {
+  function showFinishOverlay(totalTime, bestLap, playAudio = true, reason = null) {
     hideLapSplit();
+    const effectiveReason = reason || physics.state.finishReason || (totalTime >= 60.0 ? '1_MIN_LIMIT' : 'LAPS_COMPLETE');
+
+    if (elFinishEyebrow) {
+      elFinishEyebrow.textContent = 'DESKTOP CIRCUIT · 1-MINUTE TIME TRIAL';
+    }
+    if (elFinishTitle) {
+      elFinishTitle.textContent = effectiveReason === '1_MIN_LIMIT' ? 'ENDING LINE REACHED' : 'FINISH';
+    }
     if (elFinishTime) {
       elFinishTime.textContent = formatLapTimerMMSSCC(totalTime);
     }
     if (elFinishSub) {
       const bestVal = bestLap != null ? bestLap : (totalTime || 0) / 3;
       elFinishSub.textContent = `BEST LAP ${formatLapTimerMMSSCC(bestVal)}`;
+    }
+    if (elFinishBadge) {
+      elFinishBadge.textContent = effectiveReason === '1_MIN_LIMIT'
+        ? '✦ 1 MINUTE TIME TRIAL COMPLETE ✦'
+        : '✦ 3 LAPS UNDER 1 MINUTE ✦';
     }
     if (elFinishOverlay) {
       elFinishOverlay.classList.remove('hidden');
@@ -1974,14 +2045,17 @@ async function initApp() {
         audioSynth.playLapChime();
       }
     }
+    if (endingLine && endingLine.triggerCelebration) {
+      endingLine.triggerCelebration();
+    }
     finishOverlayShown = true;
   }
 
-  physics.onLapComplete((lapTime, bestLap, completedLapNum, totalTime, isFinish) => {
+  physics.onLapComplete((lapTime, bestLap, completedLapNum, totalTime, isFinish, reason) => {
     if (isFinish) {
       const finalTotal =
         totalTime ?? physics.state.finishTotalTime ?? physics.state.totalRaceTime ?? lapTime;
-      showFinishOverlay(finalTotal, bestLap ?? lapTime, true);
+      showFinishOverlay(finalTotal, bestLap ?? lapTime, true, reason);
     } else {
       audioSynth.playLapChime();
       const lapNum = completedLapNum || Math.max(1, (physics.state.lapCount || 2) - 1);
@@ -1990,8 +2064,8 @@ async function initApp() {
   });
 
   if (physics.onRaceFinish) {
-    physics.onRaceFinish((totalTime, _lapTimes, bestLap) => {
-      showFinishOverlay(totalTime, bestLap, true);
+    physics.onRaceFinish((totalTime, _lapTimes, bestLap, reason) => {
+      showFinishOverlay(totalTime, bestLap, true, reason);
     });
   }
 
@@ -2121,7 +2195,7 @@ async function initApp() {
     if (isCircuitReady) {
       btnWelcomeStart.classList.remove('is-warming-up', 'is-queued');
       if (elWelcomeProgressFill) elWelcomeProgressFill.style.width = '100%';
-      if (elWelcomeStartText) elWelcomeStartText.textContent = 'START TIME TRIAL';
+      if (elWelcomeStartText) elWelcomeStartText.textContent = 'START 1-MIN TIME TRIAL';
       if (elWelcomeEnterKbd) elWelcomeEnterKbd.textContent = 'ENTER ↵';
       focusWelcomeStartButton();
       return;
@@ -2514,6 +2588,28 @@ async function initApp() {
       }
     }
 
+    // 1-Minute Time Trial Progress Bar & Ending Line Warning
+    if (el1MinBar) {
+      const fraction = isPAutoMode ? 0.0 : Math.min(1.0, (st.totalRaceTime || 0) / 60.0);
+      el1MinBar.style.width = `${(fraction * 100).toFixed(1)}%`;
+    }
+
+    if (elEndingWarning && elEndingSec) {
+      const showWarning =
+        !isPAutoMode &&
+        st.raceClockActive &&
+        !st.raceFinished &&
+        (st.totalRaceTime || 0) >= 50.0 &&
+        (st.totalRaceTime || 0) < 60.0;
+      if (showWarning) {
+        const remSec = Math.max(1, Math.ceil(60.0 - (st.totalRaceTime || 0)));
+        elEndingSec.textContent = String(remSec);
+        elEndingWarning.classList.remove('hidden');
+      } else {
+        elEndingWarning.classList.add('hidden');
+      }
+    }
+
     drawMinimapRadar(st);
   }
 
@@ -2708,6 +2804,14 @@ async function initApp() {
     atmosphere.updateAtmosphere(elapsedTime, settings, renderer, bloomPass, scene, diorama);
     if (coaster.updateUnderTrackLed) {
       coaster.updateUnderTrackLed(elapsedTime, settings.trackGlowIntensity ?? 1.00);
+    }
+    if (endingLine && endingLine.update) {
+      endingLine.update(
+        dt,
+        elapsedTime,
+        st.timeRemaining ?? Math.max(0.0, 60.0 - (st.totalRaceTime || 0.0)),
+        st.raceFinished
+      );
     }
 
     // 4. Update Camera (Chase / Visor POV / Diorama / Helicopter / Inspector / Course Pan / Room Panorama / Gemini 4 Dresser / Keyboard Heli)
